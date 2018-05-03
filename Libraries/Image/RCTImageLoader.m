@@ -703,22 +703,42 @@ static UIImage *RCTResizeImageIfNeeded(UIImage *image,
 - (RCTImageLoaderCancellationBlock)getImageSizeForURLRequest:(NSURLRequest *)imageURLRequest
                                                        block:(void(^)(NSError *error, CGSize size))callback
 {
-  void (^completion)(NSError *, id, BOOL, NSString *) = ^(NSError *error, id imageOrData, BOOL cacheResult, NSString *fetchDate) {
-    CGSize size;
-    if ([imageOrData isKindOfClass:[NSData class]]) {
-      NSDictionary *meta = RCTGetImageMetadata(imageOrData);
-      size = (CGSize){
-        [meta[(id)kCGImagePropertyPixelWidth] doubleValue],
-        [meta[(id)kCGImagePropertyPixelHeight] doubleValue],
-      };
-    } else {
-      UIImage *image = imageOrData;
-      size = (CGSize){
-        image.size.width * image.scale,
-        image.size.height * image.scale,
-      };
-    }
-    callback(error, size);
+    void (^completion)(NSError *, id, BOOL, NSString *) = ^(NSError *error, id imageOrData, BOOL cacheResult, NSString *fetchDate) {
+      CGSize size;
+      if ([imageOrData isKindOfClass:[NSData class]]) {
+          NSDictionary *meta = RCTGetImageMetadata(imageOrData);
+
+          NSInteger imageOrientation = [meta[(id)kCGImagePropertyOrientation] integerValue];
+          switch (imageOrientation) {
+              case kCGImagePropertyOrientationLeft:
+              case kCGImagePropertyOrientationRight:
+              case kCGImagePropertyOrientationLeftMirrored:
+              case kCGImagePropertyOrientationRightMirrored:
+                  // swap width and height
+                  size = (CGSize){
+                    [meta[(id)kCGImagePropertyPixelHeight] doubleValue],
+                    [meta[(id)kCGImagePropertyPixelWidth] doubleValue],
+                  };
+                  break;
+              case kCGImagePropertyOrientationUp:
+              case kCGImagePropertyOrientationDown:
+              case kCGImagePropertyOrientationUpMirrored:
+              case kCGImagePropertyOrientationDownMirrored:
+              default:
+                  size = (CGSize){
+                    [meta[(id)kCGImagePropertyPixelWidth] doubleValue],
+                    [meta[(id)kCGImagePropertyPixelHeight] doubleValue],
+                  };
+                  break;
+          }
+      } else {
+          UIImage *image = imageOrData;
+          size = (CGSize){
+              image.size.width * image.scale,
+              image.size.height * image.scale,
+          };
+      }
+      callback(error, size);
   };
 
   return [self _loadImageOrDataWithURLRequest:imageURLRequest
